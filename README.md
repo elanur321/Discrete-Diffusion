@@ -1,2 +1,2 @@
 # Discrete-Diffusion
-masked discrete diffusion julia
+Masked discrete diffusion julia
