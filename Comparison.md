@@ -4,7 +4,7 @@
 
 The forward masking process described in section 3.2.1 is implemented in the method `_forward_pass_diffusion` which calls the helper functions `forward` and `q_xt`.
 
-```Julia
+```python
 
   def q_xt(self, x, move_chance):
     """Computes the noisy sample xt.
@@ -21,7 +21,7 @@ The forward masking process described in section 3.2.1 is implemented in the met
 
 ```
 
-```Julia
+```python
 
   def forward(self, x, sigma):
     """Returns log score."""
@@ -42,7 +42,7 @@ The forward masking process described in section 3.2.1 is implemented in the met
 
 ```
 
-```Julia
+```python
 
   def _forward_pass_diffusion(self, x0):
     t = self._sample_t(x0.shape[0], x0.device)
@@ -99,7 +99,7 @@ The forward masking process described in section 3.2.1 is implemented in the met
 
 Section 3.2.3 SUBS Parameterization discusses the specific parameterization used for this implementation. The method `_subs_parameterization` implements this logic:
 
-```Julia
+```python
   def _subs_parameterization(self, logits, xt):
     # log prob at the mask index = - infinity
     logits[:, :, self.mask_index] += self.neg_infinity
