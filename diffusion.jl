@@ -41,9 +41,10 @@ function backward(process::MaskedDiffusionLanguageModel, x_t::AbstractArray, s::
     k =
     z_t = copy(x_t)
     
-    for i in eachindex(z_t)
-    if z_t == masked
+    for i in eachindex(z_t)         #TODO: figure out how eachindex() works
+        if z_t[i] == masked             #TODO:change to whatever the masked parameter is called
 
+        end
     end
 
     return z_t
