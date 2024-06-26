@@ -7,6 +7,8 @@ struct MaskedDiffusionLanguageModel
 
 end
 
+# TODO: change to one-hot vector representations of tokens instead of single numbers
+
 function forward(process::MaskedDiffusionLanguageModel, x_s::AbstractArray, t::Real)\
     """
     Function for forward masking process described in chapter 3.2.1
@@ -41,7 +43,7 @@ function backward(process::MaskedDiffusionLanguageModel, x_t::AbstractArray, s::
     z_t = copy(x_t)
     
     for i in eachindex(z_t)         #TODO: figure out how eachindex() works
-        if z_t[i] == masked             #TODO:change to whatever the masked parameter is called
+        if z_t[i] == process.mask_token_id             #TODO:change to whatever the masked parameter is called
 
         end
     end
