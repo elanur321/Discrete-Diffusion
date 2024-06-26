@@ -1,5 +1,6 @@
 # Define the noise schedule functions 
 
+
 function α_t(t::Real)
 
     """Calculates the noise schedule parameter α_t based on the cosine noise scheduler
@@ -10,6 +11,8 @@ function α_t(t::Real)
         # Returns
         - A real number representing the noise schedule parameter α_t at time `t`.
     """
+
+    # return exp(log(1-t)) <--- Implementation of loglinear noise scheduler
 
     return cos(pi * t/2)
 end
