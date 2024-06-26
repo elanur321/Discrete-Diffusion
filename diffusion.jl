@@ -39,14 +39,16 @@ ex = MaskedDiffusionLanguageModel(length(vocab), length(vocab) + 1)
 
 function backward(process::MaskedDiffusionLanguageModel, x_t::AbstractArray, s::Real, t::Real)
     """Function for reverse unmasking process described in chapter 3.2.2"""
-    k =
+    k = length(vocab)  #i think? #TODO: know
     z_t = copy(x_t)
     
     for i in eachindex(z_t)         #TODO: figure out how eachindex() works
-        if z_t[i] == process.mask_token_id             #TODO:change to whatever the masked parameter is called
+        if z_t[i] != process.masked_token_ID     
+            z_s[i] = z_t[i]
+        else z_t[i] == process.masked_token_ID    
 
         end
     end
 
-    return z_t
+    return z_s
 end
