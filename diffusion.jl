@@ -7,6 +7,8 @@ struct MaskedDiffusionLanguageModel
 
 end
 
+# TODO: change to one-hot vector representations of tokens instead of single numbers
+
 function forward(process::MaskedDiffusionLanguageModel, x_s::AbstractArray, t::Real)\
     """
     Function for forward masking process described in chapter 3.2.1
