@@ -7,8 +7,6 @@
 - Tokenisers work by 
 - Tokenisation methods used in the article are for One Billion Words and GPT2 tokeniser for OpenWebText.
 
-### Diffusion Transformers & Model Architecture
-
 ### Forward Masking Process
 
 ### Reverse Unmasking Process
@@ -16,8 +14,6 @@
 #### SUBS - Substitution
 
 ### Loss Function
-
-### Training of Model
 
 ## Packages to Learn
 - Several packages and `Julia` concepts will be needed downstream 
