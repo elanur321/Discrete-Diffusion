@@ -1,19 +1,16 @@
 
+struct MaskedDiffusionLanguageModel
 
-function forward_mask(x::Vector, t::Float64)
+end
+
+function forward(process::MaskedDiffusionLanguageModel, x_s::AbstractArray, s::Real, t::Real)\
     """
     Function for forward masking process described in chapter 3.2.1
     """
 end
 
-function reverse_unmask()
+function backward(process::MaskedDiffusionLanguageModel, x_t::AbstractArray, s::Real, t::Real)
     """
     Function for reverse unmasking process described in chapter 3.2.2
-    """
-end
-
-function loss()
-    """
-    Function for computing loss function - primarily based on section 3.5
     """
 end
