@@ -35,20 +35,20 @@ function forward(process::MaskedDiffusionLanguageModel, x_s::CuArray, t::Real)
 end
 "
 
-function backward(process::MaskedDiffusionLanguageModel, x_theta::AbstractArray, s::Real, t::Real)
+function backward(process::MaskedDiffusionLanguageModel, x_0::AbstractArray, s::Real, t::Real)
     """Function for reverse unmasking process described in chapter 3.2.2"""
-    k = size(x_theta, 1)
+    k = size(x_0, 1)
     
-    z_t = copy(x_theta)
+    z_t = copy(x_0)
     
     for i in eachindex(z_t)         #TODO: figure out how eachindex() works
-        if z_theta[i] != process.masked_token_ID     
+        if x_0[i] != process.masked_token_ID     
             z_s[i] = z_t[i]
 
         else z_t[i] == process.mask_token_id   
 
             probs = zeros(vocab_size)
-            probs[1:vocab_size-1] = (alpha_s - alpha_t) * x_theta[1:vocab_size-1, i]
+            probs[1:vocab_size-1] = (alpha_s - alpha_t) * x_0[1:vocab_size-1, i]
             probs[vocab_size] = 1 - alpha_s
             probs ./= (1 - alpha_t)
 
@@ -65,6 +65,6 @@ _sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real,
 
 function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, s::Real, t::Real, x_0::AbstractArray, x_t::AbstractArray)
     prior = forward(process, x_0, 0, s)
-    likelihood = backward(process, x_t, s, t)
+    likelihood = backward(process, x_0, s, t)
     return sample(rng, combine(prior, likelihood))
 end
