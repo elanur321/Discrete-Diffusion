@@ -35,8 +35,10 @@ function forward(process::MaskedDiffusionLanguageModel, x_s::CuArray, t::Real)
 end
 "
 
-function backward(process::MaskedDiffusionLanguageModel, x_0::AbstractArray, s::Real, t::Real)
+function backward(process::MaskedDiffusionLanguageModel, x_t::AbstractArray, s::Real, t::Real)
     """Function for reverse unmasking process described in chapter 3.2.2"""
+    x_0 = model(z_t, t)  # This is our guess at the original text
+
     k = size(x_0, 1)
     
     z_t = copy(x_0)
@@ -65,6 +67,6 @@ _sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real,
 
 function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, s::Real, t::Real, x_0::AbstractArray, x_t::AbstractArray)
     prior = forward(process, x_0, 0, s)
-    likelihood = backward(process, x_0, s, t)
+    likelihood = backward(process, x_t, s, t)
     return sample(rng, combine(prior, likelihood))
 end
