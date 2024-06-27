@@ -40,20 +40,20 @@ ex = MaskedDiffusionLanguageModel(length(vocab), length(vocab) + 1, cosineschedu
 
 function backward(process::MaskedDiffusionLanguageModel, x_theta::AbstractArray, alpha_s::Real, alpha_t::Real)
     """Function for reverse unmasking process described in chapter 3.2.2"""
-    k = length(x_theta)
+    k = size(x_theta, 1)
     
-    z_t = copy(x_t)
+    z_t = copy(x_theta)
     
     for i in eachindex(z_t)         #TODO: figure out how eachindex() works
-        if z_t[i] != process.masked_token_ID # SUBS parameterization
+        if z_theta[i] != process.masked_token_ID     
             z_s[i] = z_t[i]
 
         else z_t[i] == process.masked_token_ID   
 
-            probs = zeros(k)
-            probs[1:K-1] = (process.α(s) - process.α(t)) * x_theta[1:K-1]
-            probs[K] = 1 - process.α(s)
-            probs ./= (1 - process.α(t))
+            probs = zeros(vocab_size)
+            probs[1:vocab_size-1] = (alpha_s - alpha_t) * x_theta[1:vocab_size-1, i]
+            probs[vocab_size] = 1 - alpha_s
+            probs ./= (1 - alpha_t)
 
             z_s[i] = rand(Categorical(probs))
 
@@ -62,7 +62,6 @@ function backward(process::MaskedDiffusionLanguageModel, x_theta::AbstractArray,
 
     return z_s
 end
-
 _sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real, x::AbstractArray) =
     sample(rng, forward(process, x, 0, t))
 
