@@ -37,30 +37,46 @@ end
 
 function backward(process::MaskedDiffusionLanguageModel, x_t::AbstractArray, s::Real, t::Real)
     """Function for reverse unmasking process described in chapter 3.2.2"""
+
+    @assert 0 ≤ s < t ≤ 1 "Invalid time steps: require 0 ≤ s < t ≤ 1"
+
     vocab_size = size(process.embedding, 1)
     x_s = copy(x_t)
     
     alpha_s = compute_alpha(process, s)
-    alpha_t = compute_alpha(process, t)
+    alpha_t = compute_alpha(process, t)  
     
-   
-    
-    for i in eachindex(x_t)      #TODO: figure out how eachindex() works
+    for i in 1:length(x_t)      
         if x_t[i] != process.mask_token_id
+            # Carry-Over Unmasking: If the token is not masked, keep it unchanged
             x_s[i] = x_t[i]
             
         else
-            x_theta = process(x_t, t) 
+        "Mistrl medium (ai) suggestion"  #TODO: check if better
+                    
+        "probs = zeros(vocab_size)
+        logits = (1 - alpha_s) .* log.(process.mask_vector[1:vocab_size-1]) + 
+                (alpha_s - alpha_t) .* x_theta[1:vocab_size-1, i]
+        probs[1:vocab_size-1] = softmax(logits)
+        # Zero masking probabilities
+        probs[process.mask_token_id] = 0
+        x_s[i] = rand(Categorical(probs))"
 
-            
-            
+            # Denoising step:
+            x_theta = process(x_t, t) 
+            # Calculate probabilities for all tokens except the mask token
             probs = zeros(vocab_size)
             probs[1:vocab_size-1] = (1 - alpha_s) * process.mask_vector[1:vocab_size-1] + 
                         (alpha_s - alpha_t) * x_theta[1:vocab_size-1, i]
-            probs ./= (1 - alpha_t)
-            # Zero masking probabilities
-            probs[process.mask_token_id] = 0
+            probs ./= (1 - alpha_t)   
+
+            # Zero Masking Probabilities: Set the probability of the mask token to 0
+            probs[process.mask_token_id, :] .= 0
+        
+            # Renormalize
+            probs ./= sum(probs, dims=1)
             
+            # Sample a token from the categorical distribution
             x_s[i] = rand(Categorical(probs))
         end
     end
