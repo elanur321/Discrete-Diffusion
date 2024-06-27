@@ -27,10 +27,21 @@ function forward(process::MaskedDiffusionLanguageModel, x_s::AbstractArray, s::R
 end
 
 " Possible implementation more efficient for GPU computations
-function forward(process::MaskedDiffusionLanguageModel, x_s::CuArray, t::Real)
+using CUDA
+
+function forward(process::MaskedDiffusionLanguageModel, x_s::MaskedArray{T,N,CuArray{T,N}}, s::Real, t::Real) where {T,N}
     p_keep = process.α(t)
-    mask = CUDA.rand(Float32, size(x_s)) .< p_keep
-    z_t = CUDA.ifelse.(mask, x_s, process.mask_token_id)
+    rand_vals = CUDA.rand(eltype(x_s.data), size(x_s.data))
+    # Create a new mask where rand_vals < p_keep
+    new_mask = rand_vals .< p_keep
+    # Combine the new mask with the existing mask
+    combined_mask = new_mask .| vec(x_s.indices)
+    # Create a new MaskedArray with the combined mask
+    z_t = MaskedArray(x_s.data, findall(combined_mask))
+    # Set all newly masked values to the mask token
+    newly_masked = findall(.!new_mask .& .!vec(x_s.indices))
+    z_t.data[newly_masked] .= process.mask_token_id
+    
     return z_t
 end
 "
