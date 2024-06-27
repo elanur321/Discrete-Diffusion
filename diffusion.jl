@@ -50,6 +50,31 @@ function forward(process::MaskedDiffusionLanguageModel, x_s::AbstractArray, s::R
 end
 "
 
+#TODO: check vector solution for optimising GPU by claude(in poe)
+" # Find indices of masked tokens  
+    masked_indices = findall(x -> x == process.mask_token_id, x_t)
+    
+    if !isempty(masked_indices)
+        # Denoising step for all masked tokens at once
+        x_theta = process(x_t, t)
+        
+        # Calculate probabilities for all tokens except the mask token, for all masked positions
+        probs = zeros(vocab_size, length(masked_indices))
+        probs[1:vocab_size-1, :] .= (1 - alpha_s) .* process.mask_vector[1:vocab_size-1] .+ 
+                    (alpha_s - alpha_t) .* x_theta[1:vocab_size-1, masked_indices]
+        probs ./= (1 - alpha_t)
+        
+        # Zero Masking Probabilities: Set the probability of the mask token to 0
+        probs[process.mask_token_id, :] .= 0
+        
+        # Renormalize
+        probs ./= sum(probs, dims=1)
+        
+        # Sample tokens from the categorical distribution for all masked positions
+        x_s[masked_indices] = [rand(Categorical(probs[:, i])) for i in 1:size(probs, 2)]
+    end"
+
+
 function backward(process::MaskedDiffusionLanguageModel, x_t::AbstractArray, s::Real, t::Real)
     """Function for reverse unmasking process described in chapter 3.2.2"""
 
