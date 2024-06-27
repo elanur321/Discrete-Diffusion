@@ -39,23 +39,29 @@ function backward(process::MaskedDiffusionLanguageModel, x_t::AbstractArray, s::
     """Function for reverse unmasking process described in chapter 3.2.2"""
     x_0 = model(z_t, t)  # This is our guess at the original text
 
-    k = size(x_0, 1)
+    vocab_size
+
+  
     
     z_t = copy(x_0)
     
     for i in eachindex(z_t)         #TODO: figure out how eachindex() works
-        if x_0[i] != process.masked_token_ID     
+        if z_t[i] != model.mask_token_id
             z_s[i] = z_t[i]
-
+            
         else z_t[i] == process.mask_token_id   
 
+            x_theta = model(z_t, t)  # This should be your neural network
+            
             probs = zeros(vocab_size)
-            probs[1:vocab_size-1] = (alpha_s - alpha_t) * x_0[1:vocab_size-1, i]
-            probs[vocab_size] = 1 - alpha_s
+            probs[1:vocab_size-1] = (1 - alpha_s) * model.mask_vector[1:vocab_size-1] + 
+                                    (alpha_s - alpha_t) * x_theta[1:vocab_size-1, i]
             probs ./= (1 - alpha_t)
-
+            
+            # Zero masking probabilities
+            probs[model.mask_token_id] = 0
+            
             z_s[i] = rand(Categorical(probs))
-
         end
     end
 
