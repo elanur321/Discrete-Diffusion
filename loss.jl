@@ -23,6 +23,8 @@ end
 
 ######################################
 
+
+# TODO: Not sure if x̂ and x are CuMatrices och just normal Matrices
 function optimized_loss(
     p::MaskedDiffusionLanguageModel,
     x̂::CuMatrix, 

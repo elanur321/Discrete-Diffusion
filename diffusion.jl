@@ -4,6 +4,7 @@ struct MaskedDiffusionLanguageModel
 
     vocab_size::Int
     mask_token_id::Int
+    α::Function
 
 end
 
@@ -16,7 +17,7 @@ function forward(process::MaskedDiffusionLanguageModel, x_s::AbstractArray, t::R
     z_t = copy(x_s)
     for (i, value) in enumerate(x_s)
 
-        p_keep = α_t(t)
+        p_keep = process.α(t)
 
         if rand() < p_keep
             z_t[i] = value
@@ -29,7 +30,7 @@ end
 ############# Example #################
 
 vocab = [1, 2, 3]
-ex = MaskedDiffusionLanguageModel(length(vocab), length(vocab) + 1)
+ex = MaskedDiffusionLanguageModel(length(vocab), length(vocab) + 1, cosineschedule)
 
 @show vocab = forward(ex, vocab, 0.1)
 @show vocab = forward(ex, vocab, 0.2)
@@ -50,9 +51,9 @@ function backward(process::MaskedDiffusionLanguageModel, x_theta::AbstractArray,
         else z_t[i] == process.masked_token_ID   
 
             probs = zeros(k)
-            probs[1:K-1] = (alpha_s - alpha_t) * x_theta[1:K-1]
-            probs[K] = 1 - alpha_s
-            probs ./= (1 - alpha_t)
+            probs[1:K-1] = (process.α(s) - process.α(t)) * x_theta[1:K-1]
+            probs[K] = 1 - process.α(s)
+            probs ./= (1 - process.α(t))
 
             z_s[i] = rand(Categorical(probs))
 
