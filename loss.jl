@@ -6,49 +6,21 @@ include("noise_schedule.jl")
 include("diffusion.jl")
 
 # TODO: Actually run code on Nvidia GPU to see if it works
+# TODO: Not sure if x̂ and x are CuMatrices och just normal Matrices
+
+function defaultscaler(p::MaskedDiffusionLanguageModel, t::Union{Real,AbstractVector{<:Real}})
+    α_t = p.α_t(t)
+    α_prime = gradient(p.α_t, t)[1]
+    return α_prime / (1 - α_t)
+end
 
 function standardloss(
     p::MaskedDiffusionLanguageModel,
-    t::Union{Real, AbstractVector{<: Real}},
-    x̂, x;
-)
-    return (gradient(x -> α_t(x), t))[1]/(1 - α_t(t)) * sum([log(x̂[n] ⋅ value) for (i, value) in enumerate(x)])
-end
-
-############# Example #################
-
-# ex = MaskedDiffusionLanguageModel(3, 4)
-
-# standardloss(ex, 0.2, [2, 3, 1], [1, 2, 3])
-
-######################################
-
-
-# TODO: Not sure if x̂ and x are CuMatrices och just normal Matrices
-function optimized_loss(
-    p::MaskedDiffusionLanguageModel,
+    t::Union{Real,AbstractVector{<:Real}},
     x̂::CuMatrix, 
     x::CuMatrix;
-    num_samples::Int = 100
+    scaler=defaultscaler
 )
-    # Sample t values uniformly between 0 and 1
-    t_samples = CUDA.rand(Float32, num_samples)
-    
-    # Compute α_t and its gradient for all sampled t values
-    α_t_vals = α_t.(t_samples)
-    grad_α_t = gradient(α_t, t_samples)[1]
-
-    dot_products = sum(x̂ .* x, dims=1)
-    log_probs = CUDA.log.(dot_products)
-    total_log_prob = sum(log_probs)
-    
-    # Compute the loss for each t sample
-    sample_losses = (grad_α_t ./ (1 .- α_t_vals)) .* total_log_prob
-    
-    # Average the losses
-    loss = mean(sample_losses)
-    
-    return loss
+    loss(x̂, x) = log.(sum(x̂ .* x, dims=1))    
+    return scaledloss(loss(x̂, parent(x)), maskedindices(x), (t -> scaler(p, t)).(t))
 end
-
-@show optimized_loss(ex, 0.2, CuArray([2, 3, 1]), CuArray([1, 2, 3]))
