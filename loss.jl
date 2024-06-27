@@ -21,6 +21,9 @@ function standardloss(
     x::CuMatrix;
     scaler=defaultscaler
 )
-    loss(x̂, x) = log.(sum(x̂ .* x, dims=1))    
-    return scaledloss(loss(x̂, parent(x)), maskedindices(x), (t -> scaler(p, t)).(t))
+
+    α_t = p.α(t)
+    α_prime = gradient(p.α, t)[1]
+    
+    return( α_prime / (1 - α_t)) * log.(sum(x̂ .* x, dims=1))
 end
