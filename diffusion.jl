@@ -35,20 +35,22 @@ function forward(process::MaskedDiffusionLanguageModel, x_s::CuArray, t::Real)
 end
 "
 
-function backward(process::MaskedDiffusionLanguageModel, x_theta::AbstractArray, s::Real, t::Real)
+function backward(process::MaskedDiffusionLanguageModel, x_t::AbstractArray, s::Real, t::Real)
     """Function for reverse unmasking process described in chapter 3.2.2"""
-    k = size(x_theta, 1)
+    x_0 = model(z_t, t)  # This is our guess at the original text
+
+    k = size(x_0, 1)
     
-    z_t = copy(x_theta)
+    z_t = copy(x_0)
     
     for i in eachindex(z_t)         #TODO: figure out how eachindex() works
-        if z_theta[i] != process.masked_token_ID     
+        if x_0[i] != process.masked_token_ID     
             z_s[i] = z_t[i]
 
         else z_t[i] == process.mask_token_id   
 
             probs = zeros(vocab_size)
-            probs[1:vocab_size-1] = (alpha_s - alpha_t) * x_theta[1:vocab_size-1, i]
+            probs[1:vocab_size-1] = (alpha_s - alpha_t) * x_0[1:vocab_size-1, i]
             probs[vocab_size] = 1 - alpha_s
             probs ./= (1 - alpha_t)
 
