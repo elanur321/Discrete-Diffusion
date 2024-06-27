@@ -3,7 +3,7 @@ include("noise_schedule.jl")
 struct MaskedDiffusionLanguageModel 
 
     vocab_size::Int
-    mask_token_id::Int
+    mask_token_id::AbstractArray
     α::Function
 
 end
@@ -26,31 +26,28 @@ function forward(process::MaskedDiffusionLanguageModel, x_s::AbstractArray, s::R
     return z_t
 end
 
+" Possible implementation more efficient for GPU computations
+function forward(process::MaskedDiffusionLanguageModel, x_s::CuArray, t::Real)
+    p_keep = process.α(t)
+    mask = CUDA.rand(Float32, size(x_s)) .< p_keep
+    z_t = CUDA.ifelse.(mask, x_s, process.mask_token_id)
+    return z_t
+end
+"
 
-############# Example #################
-
-vocab = [1, 2, 3]
-ex = MaskedDiffusionLanguageModel(length(vocab), length(vocab) + 1, cosineschedule)
-
-@show vocab = forward(ex, vocab, 0, 0.1)
-@show vocab = forward(ex, vocab, 0, 0.2)
-@show vocab = forward(ex, vocab, 0, 0.3)
-
-######################################
-
-function backward(process::MaskedDiffusionLanguageModel, x_theta::AbstractArray, alpha_s::Real, alpha_t::Real)
+function backward(process::MaskedDiffusionLanguageModel, x_theta::AbstractArray, s::Real, t::Real)
     """Function for reverse unmasking process described in chapter 3.2.2"""
-    k = length(x_theta)
+    K = length(x_theta)
     
-    z_t = copy(x_t)
+    z_t = copy(x_theta)
     
     for i in eachindex(z_t)         #TODO: figure out how eachindex() works
-        if z_t[i] != process.masked_token_ID # SUBS parameterization
+        if z_t[i] != process.mask_token_id # SUBS parameterization
             z_s[i] = z_t[i]
 
-        else z_t[i] == process.masked_token_ID   
+        else z_t[i] == process.mask_token_id   
 
-            probs = zeros(k)
+            probs = zeros(K)
             probs[1:K-1] = (process.α(s) - process.α(t)) * x_theta[1:K-1]
             probs[K] = 1 - process.α(s)
             probs ./= (1 - process.α(t))
@@ -62,7 +59,7 @@ function backward(process::MaskedDiffusionLanguageModel, x_theta::AbstractArray,
 
     return z_s
 end
-
+"""
 _sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real, x::AbstractArray) =
     sample(rng, forward(process, x, 0, t))
 
@@ -71,3 +68,4 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
     likelihood = backward(process, x_t, s, t)
     return sample(rng, combine(prior, likelihood))
 end
+"""
