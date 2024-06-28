@@ -3,7 +3,9 @@ using Zygote
 using Random
 using Flux.Losses
 using CUDA
+using Flux
 using LinearAlgebra
+using Test
 using Statistics
 
 include("noise_schedule.jl")
@@ -23,5 +25,23 @@ function standardloss(
     scaler=defaultscaler
 )
     α_t, α_prime = p.α(t)
-    return (α_prime/(1 .- α_t)) .* logitcrossentropy(x̂, x; dims = 1, agg = mean)
+
+    scaling_factor = α_prime ./ (1 .- α_t)
+
+    if size(x̂[1]) == ()
+        loss = logitcrossentropy(x̂, x)
+        scaled_loss = scaling_factor * loss
+    else
+        batch_loss = logitcrossentropy.(x̂, x)
+        scaled_loss = scaling_factor .* batch_loss
+    end
+
+    return scaled_loss
 end
+
+e = MaskedDiffusionLanguageModel(1, [0, 0, 1], linear, defaultscaler)
+
+@show standardloss(e, [0.2, 0.2], [[0.4,0.6], [0.2, 0.8]], [[1,0],[0,1]])
+
+@show standardloss(e, 0.2, [0.2, 0.8], [0, 1])
+
