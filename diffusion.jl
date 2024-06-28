@@ -53,7 +53,6 @@ end
 _sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real, x::AbstractArray) =
     sample(rng, forward(process, x, 0, t))
 
-#TODO: LOOK AT VECTORS AND OTHER GPU OPTIMIZATIONS
 
 function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, s::Real, t::Real, x_0::AbstractArray, x_t::AbstractArray)
     @assert 0 ≤ s < t ≤ 1 "Invalid time steps: require 0 ≤ s < t ≤ 1"
@@ -70,7 +69,6 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
     
     alpha_s = process.α(s)
     alpha_t = process.α(t)  
-
 
     # Create a mask for non-masked tokens
     non_masked = x_t .!= process.mask_token_id
@@ -95,7 +93,7 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
 
     # Combine non-masked tokens and sampled tokens
     x_s = ifelse.(non_masked, x_t, sampled_tokens)
-    
+
 
     #old non vectorised code. keeping untill sure the optimizations works (no guarantee the old code works either)
     "
@@ -110,8 +108,6 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
             # Compute unnormalized log probabilities for non-masked tokens
             logits = (1 - alpha_s) .* log.(process.mask_vector[1:vocab_size-1]) .+ 
                      (alpha_s - alpha_t) .* x_theta[1:vocab_size-1, i]
-
-           
             
             # Normalize using softmax
             probs = zeros(vocab_size)
