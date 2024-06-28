@@ -61,8 +61,7 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
     "likelihood = backward(process, x_t, s, t)" #prev
 
     # Move data to GPU
-    x_0 = CuArray(x_0)
-    x_t = CuArray(x_t)
+    x_0 = CuArray(x_0), x_t = CuArray(x_t)
 
     vocab_size = size(process.embedding, 1) #TODO: check this
     x_s = copy(x_t)
@@ -89,7 +88,7 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
     probs[process.mask_token_id, :] .= 0
 
     # Sample tokens from categorical distribution
-    sampled_tokens = [rand(Categorical(probs[:, i])) for i in 1:size(probs, 2)]  #TODO: learn wahate exactly rabd(categorical(probs)) does when choosing
+    sampled_tokens = [rand(Categorical(probs[:, i])) for i in eachindex(probs, 2)]  #TODO: learn what exactly rand(categorical(probs)) does when choosing
 
     # Combine non-masked tokens and sampled tokens
     x_s = ifelse.(non_masked, x_t, sampled_tokens)
@@ -121,7 +120,7 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
         end
     end
     "
-    "return x_s" #from backwrd
+    "return x_s" #from backard
 
     return sample(rng, combine(prior, x_s)) #quick merge
 
