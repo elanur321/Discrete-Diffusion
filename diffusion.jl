@@ -77,7 +77,7 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
             # Compute unnormalized log probabilities for non-masked tokens
             logits = (1 - alpha_s) .* log.(process.mask_vector[1:vocab_size-1]) + 
                      (alpha_s - alpha_t) .* x_theta[1:vocab_size-1, i]
-s
+
             logits ./= 1-alfa_t
             
             # Normalize using softmax
