@@ -53,6 +53,8 @@ end
 _sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real, x::AbstractArray) =
     sample(rng, forward(process, x, 0, t))
 
+#TODO: LOOK AT VECTORS AND OTHER GPU OPTIMIZATIONS
+
 function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, s::Real, t::Real, x_0::AbstractArray, x_t::AbstractArray)
     prior = forward(process, x_0, 0, s)
     "likelihood = backward(process, x_t, s, t)" #prev
@@ -63,13 +65,11 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
     alpha_s = process.α(s)
     alpha_t = process.α(t)  
     
-    for i in 1:length(x_t)      
+    for i in eachindex(x_t)      
         if x_t[i] != process.mask_token_id
             # Carry-Over Unmasking: If the token is not masked, keep it unchanged
             x_s[i] = x_t[i]
-            
         else
-       
 
             x_theta = process(x_t, t) 
             
@@ -77,7 +77,7 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
             logits = (1 - alpha_s) .* log.(process.mask_vector[1:vocab_size-1]) + 
                      (alpha_s - alpha_t) .* x_theta[1:vocab_size-1, i]
 
-            logits ./= 1-alfa_t
+            "logits ./= 1-alfa_t" #not needed cause its included in softmax ahead TODO: understand math in softmax better
             
             # Normalize using softmax
             probs = zeros(vocab_size)
@@ -91,9 +91,9 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
         end
     end
 
+    "return x_s" #from backwrd
 
-    return x_s
-
+    return sample(rng, combine(prior, x_s)) #quick merge
 
     "return sample(rng, combine(prior, likelihood))" #prev
 end
