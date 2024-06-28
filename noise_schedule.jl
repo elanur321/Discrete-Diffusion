@@ -1,7 +1,7 @@
 # Define the noise schedule functions 
 
 function cosineschedule(t::Union{Real,AbstractVector{<:Real}})
-    return cos(pi * t/2)
+    return cos.(pi .* t ./ 2)
 end
 
 function loglinear(t::Union{Real,AbstractVector{<:Real}})
