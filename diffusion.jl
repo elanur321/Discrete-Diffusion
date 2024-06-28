@@ -55,7 +55,9 @@ _sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real,
 
 #TODO: LOOK AT VECTORS AND OTHER GPU OPTIMIZATIONS
 
-function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, s::Real, t::Real, x_0::AbstractArray, x_t::AbstractArray)
+function _endpoint_conditioned_sample(rng::CUDA.RNG, process::MaskedDiffusionLanguageModel, s::Real, t::Real, x_0::CuArray, x_t::CuArray)
+    @assert 0 ≤ s < t ≤ 1 "Invalid time steps: require 0 ≤ s < t ≤ 1"
+    
     prior = forward(process, x_0, 0, s)
     "likelihood = backward(process, x_t, s, t)" #prev
 
@@ -84,7 +86,7 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
             probs[1:vocab_size-1] = softmax(logits)
             
             # Zero masking probabilities
-            probs[process.mask_token_id] = 0
+            CUDA.@inbounds probs[process.mask_token_id, :] .= 0
             
             # Sample a token from the categorical distribution
             x_s[i] = rand(Categorical(probs))
