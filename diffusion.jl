@@ -55,10 +55,9 @@ _sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real,
 
 
 function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, s::Real, t::Real, x_0::AbstractArray, x_t::AbstractArray)
-    @assert 0 ≤ s < t ≤ 1 "Invalid time steps: require 0 ≤ s < t ≤ 1"
+    @assert 0 ≤ s < t ≤ 1 "Invalid time steps: require 0 ≤ s < t ≤ 1" #not sure if this is needed but il keep it here
     
     prior = forward(process, x_0, 0, s)
-    "likelihood = backward(process, x_t, s, t)" #prev
 
     # Move data to GPU
     x_0 = CuArray(x_0), x_t = CuArray(x_t)
