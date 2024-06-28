@@ -55,18 +55,50 @@ _sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real,
 
 #TODO: LOOK AT VECTORS AND OTHER GPU OPTIMIZATIONS
 
-function _endpoint_conditioned_sample(rng::CUDA.RNG, process::MaskedDiffusionLanguageModel, s::Real, t::Real, x_0::CuArray, x_t::CuArray)
+function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, s::Real, t::Real, x_0::AbstractArray, x_t::AbstractArray)
     @assert 0 ≤ s < t ≤ 1 "Invalid time steps: require 0 ≤ s < t ≤ 1"
     
     prior = forward(process, x_0, 0, s)
     "likelihood = backward(process, x_t, s, t)" #prev
 
-    vocab_size = size(process.embedding, 1)
+    # Move data to GPU
+    x_0 = CuArray(x_0)
+    x_t = CuArray(x_t)
+
+    vocab_size = size(process.embedding, 1) #TODO: check this
     x_s = copy(x_t)
     
     alpha_s = process.α(s)
     alpha_t = process.α(t)  
+
+
+    # Create a mask for non-masked tokens
+    non_masked = x_t .!= process.mask_token_id
+
+    # Process all tokens at once
+    x_theta = process(x_t, t)
+
+    # Compute unnormalized log probabilities for non-masked tokens
+    # Compute logits for all tokens
+    logits = (1 - alpha_s) .* log.(process.mask_vector[1:vocab_size-1]) .+ 
+             (alpha_s - alpha_t) .* x_theta[1:vocab_size-1, :]
+
+    # Normalize using softmax
+    # Compute probabilities using softmax
+    probs = vcat(softmax(logits, dims=1), zeros(1, size(logits, 2)))    #TODO: understand softmax better
+
+    # Zero out probabilities for mask token
+    probs[process.mask_token_id, :] .= 0
+
+    # Sample tokens from categorical distribution
+    sampled_tokens = [rand(Categorical(probs[:, i])) for i in 1:size(probs, 2)]  #TODO: learn wahate exactly rabd(categorical(probs)) does when choosing
+
+    # Combine non-masked tokens and sampled tokens
+    x_s = ifelse.(non_masked, x_t, sampled_tokens)
     
+
+    #old non vectorised code. keeping untill sure the optimizations works (no guarantee the old code works either)
+    "
     for i in eachindex(x_t)      
         if x_t[i] != process.mask_token_id
             # Carry-Over Unmasking: If the token is not masked, keep it unchanged
@@ -74,25 +106,25 @@ function _endpoint_conditioned_sample(rng::CUDA.RNG, process::MaskedDiffusionLan
         else
 
             x_theta = process(x_t, t) 
-            
+
             # Compute unnormalized log probabilities for non-masked tokens
-            logits = (1 - alpha_s) .* log.(process.mask_vector[1:vocab_size-1]) + 
+            logits = (1 - alpha_s) .* log.(process.mask_vector[1:vocab_size-1]) .+ 
                      (alpha_s - alpha_t) .* x_theta[1:vocab_size-1, i]
 
-            "logits ./= 1-alfa_t" #not needed cause its included in softmax ahead TODO: understand math in softmax better
+           
             
             # Normalize using softmax
             probs = zeros(vocab_size)
-            probs[1:vocab_size-1] = softmax(logits)
+            probs[1:vocab_size-1] = softmax(logits) #TODO: understand softmax better
             
             # Zero masking probabilities
             CUDA.@inbounds probs[process.mask_token_id, :] .= 0
             
             # Sample a token from the categorical distribution
-            x_s[i] = rand(Categorical(probs))
+            x_s[i] = rand(Categorical(probs))  #TODO: learn wahate exactly rabd(categorical(probs)) does when choosing
         end
     end
-
+    "
     "return x_s" #from backwrd
 
     return sample(rng, combine(prior, x_s)) #quick merge
