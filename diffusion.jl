@@ -73,7 +73,7 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
     # Move data to GPU
     x_0 = CuArray(x_0), x_t = CuArray(x_t)
 
-    vocab_size = size(process.embedding, 1) #TODO: check this
+    vocab_size = size(process.embedding, 1)
     x_s = copy(x_t)
     
     alpha_s = process.α(s) # TODO: This function has been changed, now returns (value of noise noise_schedule, gradient of noise_schedule)
@@ -82,17 +82,14 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
     # Create a mask for non-masked tokens
     non_masked = x_t .!= process.mask_token_id
 
-    # Process all tokens at once
-    x_theta = process(x_t, t) # TODO: I think you don't need to predict using any type of process here, but you can instead just use x_0 as passed to the function
+    "x_theta = process(x_t, t) "# TODO: I think you don't need to predict using any type of process here, but you can instead just use x_0 as passed to the function
+    #ah thats a remnant of old code i believe, il keep it in quotationmarks for now just in case
 
-    # Compute unnormalized log probabilities for non-masked tokens
-    # Compute logits for all tokens
-    logits = (1 - alpha_s) .* log.(process.mask_vector[1:vocab_size-1]) .+ 
-             (alpha_s - alpha_t) .* x_theta[1:vocab_size-1, :]
+    # Compute unnormalized log probabilities for all non-masked tokens
+    logits = (1 - alpha_s) .* log.(process.mask_vector[1:vocab_size-1]) .+ (alpha_s - alpha_t) .* x_0[1:vocab_size-1, :]
 
-    # Normalize using softmax
-    # Compute probabilities using softmax
-    probs = vcat(softmax(logits, dims=1), zeros(1, size(logits, 2)))    #TODO: understand softmax better
+    # Normalize / Compute probabilities using softmax
+    probs = vcat(softmax(logits, dims=1), zeros(1, size(logits, 2)))   
 
     # Zero out probabilities for mask token
     probs[process.mask_token_id, :] .= 0
@@ -104,9 +101,9 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
     x_s = ifelse.(non_masked, x_t, sampled_tokens)
 
 
+   
     #old non vectorised code. keeping untill sure the optimizations works (no guarantee the old code works either)
-    "
-    for i in eachindex(x_t)      
+    "for i in eachindex(x_t)      
         if x_t[i] != process.mask_token_id
             # Carry-Over Unmasking: If the token is not masked, keep it unchanged
             x_s[i] = x_t[i]
@@ -128,11 +125,9 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
             # Sample a token from the categorical distribution
             x_s[i] = rand(Categorical(probs))  #TODO: learn wahate exactly rabd(categorical(probs)) does when choosing
         end
-    end
-    "
-    "return x_s" #from backard
+    end"
 
     return sample(rng, combine(prior, x_s)) #quick merge
 
-    "return sample(rng, combine(prior, likelihood))" #prev
+
 end
