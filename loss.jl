@@ -28,59 +28,59 @@ function standardloss(
 
     scaling_factor = α_prime ./ (1 .- α_t)
 
-    losses = map(zip(x̂, x)) do (x̂_batch, x_batch)
-        sum(logitcrossentropy.(x̂_batch, x_batch))
+    if true
+        losses = map(zip(x̂, x)) do (x̂_batch, x_batch)
+            sum(logitcrossentropy.(x̂_batch, x_batch))
+        end
+    else
+
     end
 
     return losses .* scaling_factor
 end
 
-### EXAMPLE ###
+########################### TEST ################################
 
-e = MaskedDiffusionLanguageModel(1, [0, 0, 0, 1], linear)
+function standardloss(
+    p::MaskedDiffusionLanguageModel,
+    t::Union{Real,AbstractVector{<:Real}},
+    x̂, x;
+    scaler=defaultscaler
+)
+    # Ensure x̂ and x have the same size
+    @assert size(x̂) == size(x) "Dimensions of x̂ and x must match"
 
-# @show standardloss(e, 0.2, [[0.4,0.6], [0.2, 0.8]], [[1,0],[0,1]])
+    @show p.α(t)
+    α_t, α_prime = p.α(t)
+    scaling_factor = α_prime ./ (1 .- α_t)
 
-# @show standardloss(e, 0.2, [0.2, 0.8], [0, 1])
+    if ndims(x̂) == 2  # Single batch case
+        @show "SINGLE BATCH"
 
-x = [
-    # First sample in batch
-    [
-        [1, 0, 0, 0],  # First token is category 1
-        [0, 1, 0, 0],  # Second token is category 2
-        [0, 0, 0, 1]   # Third token is category 4
-    ],
-    
-    # Second sample in batch
-    [
-        [0, 1, 0, 0],  # First token is category 2
-        [0, 0, 1, 0],  # Second token is category 3
-        [1, 0, 0, 0]   # Third token is category 1
-    ]
-]
+        @assert length(scaling_factor) == 1 "For single batch, scaling_factor should be a single value"
 
-x̂ = [
-    # First sample in batch
-    [
-        [ 2.0, -1.0,  0.5,  0.1],  # Logits for first token
-        [-0.5,  1.5,  0.0, -1.0],  # Logits for second token
-        [ 0.2,  0.3, -0.5,  1.0]   # Logits for third token
-    ],
-    
-    # Second sample in batch
-    [
-        [ 0.5,  1.0, -1.0,  0.2],  # Logits for first token
-        [-0.2,  0.1,  2.0, -0.5],  # Logits for second token
-        [ 1.5, -1.0,  0.0,  0.5]   # Logits for third token
-    ]
-]
+        # Compute logitcrossentropy for the single batch
+        loss = logitcrossentropy(x̂, x)
 
-# standardloss(e, 0.2, x̂, x)
+        # Apply scaling factor before summing
+        scaled_loss = scaling_factor[1] .* loss
 
-@show sum(logitcrossentropy.(x̂[1], x[1]))
+        return [sum(scaled_loss)]  # Return as a single-element vector for consistency
+    else  # Multiple batches case
+         @show "BIG BATCH"
+        @assert size(x̂, 3) == length(scaling_factor) "Number of batches must match length of scaling_factor"
 
-@show losses = map(zip(x̂, x)) do (x̂_batch, x_batch)
-    sum(logitcrossentropy.(x̂_batch, x_batch))
+        # Compute logitcrossentropy for all batches at once
+        losses = logitcrossentropy.(eachslice(x̂, dims=3), eachslice(x, dims=3))
+
+        # Apply scaling factor to each batch before summing
+        # Reshape scaling_factor to broadcast correctly
+        scaled_losses = losses .* reshape(scaling_factor, (1, 1, :))
+
+        # Sum the scaled losses for each batch
+        batch_losses = vec(sum(scaled_losses, dims=(1,2)))
+
+        return batch_losses
+    end
 end
 
-@show standardloss(e, 0.2, x̂, x)
