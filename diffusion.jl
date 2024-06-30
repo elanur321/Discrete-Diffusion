@@ -3,55 +3,66 @@ include("noise_schedule.jl")
 struct MaskedDiffusionLanguageModel 
 
     vocab_size::Int
-    mask_token_id::AbstractArray
+    mask_token_id
     α::Function
 
 end
 
 # TODO: change to one-hot vector representations of tokens instead of single numbers
 
-function forward(process::MaskedDiffusionLanguageModel, x_s::AbstractArray, s::Real, t::Real)\
-    """
-    Function for forward masking process described in chapter 3.2.1
-    """
-    z_t = copy(x_s)
-    for (i, value) in enumerate(x_s)
+function _sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real, x::AbstractArray)
 
-        p_keep = process.α(t)
+    z_t = copy(x)
+    for (i, value) in enumerate(x)
+
+        p_keep = process.α(t)[1]
 
         if rand() < p_keep
             z_t[i] = value
         else z_t[i] = process.mask_token_id end
     end
     return z_t
+
 end
 
 " Possible implementation more efficient for GPU computations
 using CUDA
 
-function forward(process::MaskedDiffusionLanguageModel, x_s::AbstractArray, s::Real, t::Real)
-    p_keep = process.α(t)
-    rand_vals = CUDA.rand(eltype(x_s.data), size(x_s.data))
-    
-    # Create a new mask where rand_vals < p_keep
-    new_mask = rand_vals .< p_keep
+function _sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real, x::AbstractArray)
+    # Move data to GPU
+    z_t = CUDA.fill(process.mask_token_id, size(x))
+    x_d = CuArray(x)
+    p_keep = process.α(t)[1]
 
-    # Combine the new mask with the existing mask
-    combined_mask = new_mask .| vec(x_s.indices)
+    # Generate random numbers on the GPU
+    rand_vals = CUDA.rand(size(x_d))
 
-    # Create a new MaskedArray with the combined mask
-    z_t = MaskedArray(x_s.data, findall(combined_mask))
+    # Apply mask condition
+    mask = rand_vals .< p_keep
+    z_t[mask] .= x_d[mask]
 
-    # Set all newly masked values to the mask token
-    newly_masked = findall(.!new_mask .& .!vec(x_s.indices))
-    z_t.data[newly_masked] .= process.mask_token_id
-    
-    return z_t
+    return Array(z_t)  # Move data back to CPU if needed
 end
 "
 
-_sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real, x::AbstractArray) =
-    sample(rng, forward(process, x, 0, t))
+"""
+function _sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real, x::AbstractArray)
+    # Create a copy of x
+    z_t = fill(process.mask_token_id, size(x))
+    p_keep = process.α(t)[1]
+
+    # Generate random numbers and create a mask
+    rand_vals = rand(rng, size(x))
+    mask = rand_vals .< p_keep
+
+    # Apply mask condition
+    z_t[mask] .= x[mask]
+
+    return z_t
+end"""
+
+#_sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real, x::AbstractArray) =
+    #sample(rng, forward(process, x, 0, t))
 
 
 function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, s::Real, t::Real, x_0::AbstractArray, x_t::AbstractArray)
