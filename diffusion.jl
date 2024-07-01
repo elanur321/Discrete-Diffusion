@@ -76,8 +76,8 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
     vocab_size = size(process.embedding, 1)
     x_s = copy(x_t)
     
-    alpha_s = process.α(s) # TODO: This function has been changed, now returns (value of noise noise_schedule, gradient of noise_schedule)
-    alpha_t = process.α(t)  
+    alpha_s = process.α(s)[1] # TODO: This function has been changed, now returns (value of noise noise_schedule, gradient of noise_schedule)
+    alpha_t = process.α(t)[1]  
 
     # Create a mask for non-masked tokens
     non_masked = x_t .!= process.mask_token_id
