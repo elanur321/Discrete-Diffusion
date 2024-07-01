@@ -68,7 +68,7 @@ end"""
 function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, s::Real, t::Real, x_0::AbstractArray, x_t::AbstractArray)
     @assert 0 ≤ s < t ≤ 1 "Invalid time steps: require 0 ≤ s < t ≤ 1" #not sure if this is needed but il keep it here
     
-    prior = forward(process, x_0, 0, s)
+    "prior = _sampleforward(process, x_0, 0, s)"
 
     # Move data to GPU
     x_0 = CuArray(x_0), x_t = CuArray(x_t)
@@ -88,11 +88,11 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
     # Normalize / Compute probabilities using softmax
     probs = vcat(softmax(logits, dims=1), zeros(1, size(logits, 2)))   
 
-    # Zero out probabilities for mask token
+    # make probabilities for mask 0
     probs[process.mask_token_id, :] .= 0
 
-    # Sample tokens from categorical distribution
-    sampled_tokens = [rand(Categorical(probs[:, i])) for i in eachindex(probs, 2)]  #TODO: learn what exactly rand(categorical(probs)) does when choosing
+    # Sample tokens from categorical distribution. takes random number 0-1 and choses the word with the probability that matches
+    sampled_tokens = [rand(Categorical(probs[:, i])) for i in eachindex(probs, 2)]
 
     # Combine non-masked tokens and sampled tokens
     x_s = ifelse.(non_masked, x_t, sampled_tokens)
@@ -112,5 +112,7 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
         end
     end"
 
-    return sample(rng, combine(prior, x_s))
+    return x_s
+
+    "return sample(rng, combine(prior, x_s))"
 end
