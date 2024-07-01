@@ -106,11 +106,10 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
     logits = (1 - alpha_s) .* log.(process.mask_token_id) .+ 
              (alpha_s - alpha_t) .* x_theta[1:vocab_size-1, :]
 
-    # Normalize using softmax
-    # Compute probabilities using softmax
-    probs = vcat(softmax(logits, dims=1), zeros(1, size(logits, 2)))    #TODO: understand softmax better
+    # Normalize / Compute probabilities using softmax
+    probs = vcat(softmax(logits, dims=1), zeros(1, size(logits, 2)))   
 
-    # Zero out probabilities for mask token
+    # make probabilities for mask 0
     probs[process.mask_token_id, :] .= 0
 
     @show probs
@@ -122,19 +121,13 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
 
     # Combine non-masked tokens and sampled tokens
     x_s = ifelse.(non_masked, x_t, sampled_tokens)
-
-
+   
     #old non vectorised code. keeping untill sure the optimizations works (no guarantee the old code works either)
-    "
-    for i in eachindex(x_t)      
-        if x_t[i] != process.mask_token_id
-            # Carry-Over Unmasking: If the token is not masked, keep it unchanged
+    "for i in eachindex(x_t)      
+        if x_t[i] != process.mask_token_id # Carry-Over Unmasking: If the token is not masked, keep it unchanged
             x_s[i] = x_t[i]
         else
-
             x_theta = process(x_t, t) 
-
-            # Compute unnormalized log probabilities for non-masked tokens
             logits = (1 - alpha_s) .* log.(process.mask_vector[1:vocab_size-1]) .+ 
                      (alpha_s - alpha_t) .* x_theta[1:vocab_size-1, i]
             
