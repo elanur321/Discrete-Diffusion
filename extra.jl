@@ -38,10 +38,6 @@ function forward(process::MaskedDiffusionLanguageModel, x::AbstractArray, s::Rea
     return CategoricalVariables([Categorical([p, 1-p]) for p in probs])
 end
 
-_sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real, x::AbstractArray) =
-    sample(rng, forward(process, x, 0, t))
-
-
 sampleforward(process, t, x) = sampleforward(Random.default_rng(), process, t, x)
 
 sampleforward(
@@ -82,6 +78,8 @@ function forward(process::MaskedDiffusionLanguageModel, x::AbstractMatrix, s::Re
     end
 
     categorical_probs = [SVector{size(x, 2), Float32}(probs[i, :]) for i in 1:size(probs, 1)]
+
+    @show categorical_probs
     
     return CategoricalVariables(categorical_probs)
 end
@@ -101,11 +99,21 @@ x = Float32[
 x̂ = Float32[
     0 1 0;  # Token 1
     0 1 0;  # Token 2
-    1 0 0;  # Masked token
+    0 0 1;  # Masked token
     1 0 0;  # Token 1
     0 1 0   # Token 2
 ]
 
-# @show _sampleforward(Random.default_rng(), process, 0.5, x)
+# @show _sampleforward(Random.default_rng(), process, 0.3, x)
+
+# @show standardloss(process, 0.5, x̂, x)
+
+p = MaskedDiffusionLanguageModel(5, 10, linear)
+
 
 @show standardloss(process, 0.5, x̂, x)
+
+# @show _sampleforward(rng, p, 0.5, x)
+
+# @show sampleforward(p, 0.5, x)
+

@@ -1,6 +1,19 @@
 include("noise_schedule.jl")
+using Random
+using StatsBase
+using Distributions
 
-struct MaskedDiffusionLanguageModel 
+abstract type Process end
+
+Base.broadcastable(x::Process) = Ref(x)
+
+abstract type TractableProcess <: Process end #Tractable uncertainty propogation
+abstract type SamplingProcess <: Process end #Only deals with point masses and sampling
+
+abstract type GaussianStateProcess <: TractableProcess end
+abstract type DiscreteStateProcess <: TractableProcess end
+
+struct MaskedDiffusionLanguageModel <: DiscreteStateProcess
 
     vocab_size::Int
     mask_token_id
@@ -68,26 +81,29 @@ end"""
 function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, s::Real, t::Real, x_0::AbstractArray, x_t::AbstractArray)
     @assert 0 ≤ s < t ≤ 1 "Invalid time steps: require 0 ≤ s < t ≤ 1" #not sure if this is needed but il keep it here
     
-    prior = forward(process, x_0, 0, s)
+    #prior = forward(process, x_0, 0, s)
 
     # Move data to GPU
-    x_0 = CuArray(x_0), x_t = CuArray(x_t)
+    # x_0 = CuArray(x_0), x_t = CuArray(x_t)
 
-    vocab_size = size(process.embedding, 1) #TODO: check this
+    # vocab_size = size(process.embedding, 1) #TODO: check this
+    vocab_size = process.vocab_size
     x_s = copy(x_t)
     
-    alpha_s = process.α(s) # TODO: This function has been changed, now returns (value of noise noise_schedule, gradient of noise_schedule)
-    alpha_t = process.α(t)  
+    alpha_s = process.α(s)[1] # TODO: This function has been changed, now returns (value of noise noise_schedule, gradient of noise_schedule)
+    alpha_t = process.α(t)[1]  
 
     # Create a mask for non-masked tokens
     non_masked = x_t .!= process.mask_token_id
 
     # Process all tokens at once
-    x_theta = process(x_t, t) # TODO: I think you don't need to predict using any type of process here, but you can instead just use x_0 as passed to the function
+    # x_theta = process(x_t, t) # TODO: I think you don't need to predict using any type of process here, but you can instead just use x_0 as passed to the function
+
+    x_theta = x_0
 
     # Compute unnormalized log probabilities for non-masked tokens
     # Compute logits for all tokens
-    logits = (1 - alpha_s) .* log.(process.mask_vector[1:vocab_size-1]) .+ 
+    logits = (1 - alpha_s) .* log.(process.mask_token_id) .+ 
              (alpha_s - alpha_t) .* x_theta[1:vocab_size-1, :]
 
     # Normalize using softmax
@@ -96,6 +112,10 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
 
     # Zero out probabilities for mask token
     probs[process.mask_token_id, :] .= 0
+
+    @show probs
+
+    @show rand(Categorical(probs[:, 1]))
 
     # Sample tokens from categorical distribution
     sampled_tokens = [rand(Categorical(probs[:, i])) for i in eachindex(probs, 2)]  #TODO: learn what exactly rand(categorical(probs)) does when choosing
@@ -135,4 +155,47 @@ function _endpoint_conditioned_sample(rng::AbstractRNG, process::MaskedDiffusion
     return sample(rng, combine(prior, x_s)) #quick merge
 
     "return sample(rng, combine(prior, likelihood))" #prev
+end
+
+
+# Quick-fix implementation
+function _endpoint_conditioned_sample(
+    rng::AbstractRNG, 
+    process::MaskedDiffusionLanguageModel, 
+    s::Real, 
+    t::Real, 
+    x0::AbstractVector{Int}, 
+    xt::AbstractVector{Int}
+)
+    @assert 0 ≤ s < t ≤ 1 "Invalid time steps: require 0 ≤ s < t ≤ 1"
+    @assert length(x0) == length(xt) "x0 and xt must have the same length"
+    
+    vocab_size = process.vocab_size
+    sequence_length = length(xt)
+    xs = copy(xt)
+    
+    α_s = process.α(s)[1]
+    α_t = process.α(t)[1]
+
+    for i in 1:sequence_length
+        if xt[i] == process.mask_token_id
+            # For masked tokens, compute probabilities
+            probs = zeros(Float32, vocab_size)
+            
+            # Probability of keeping the mask
+            probs[process.mask_token_id] = 1 - α_s
+            
+            # Probability of sampling the predicted token
+            probs[x0[i]] = α_s - α_t
+            
+            # Normalize probabilities
+            probs ./= sum(probs)
+            
+            # Sample new token
+            xs[i] = rand(rng, Categorical(probs))
+        end
+        # For unmasked tokens, xs[i] remains unchanged (equal to xt[i])
+    end
+
+    return xs
 end
