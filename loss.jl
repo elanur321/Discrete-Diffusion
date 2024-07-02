@@ -2,8 +2,6 @@
 using Zygote
 using Random
 using Flux.Losses
-# using CUDA
-using Flux
 using LinearAlgebra
 using Test
 using Statistics
@@ -12,35 +10,16 @@ include("noise_schedule.jl")
 include("diffusion.jl")
 
 
-# TODO: Actually run code on Nvidia GPU to see if it works
-# TODO: Not sure if x̂ and x are CuMatrices och just normal Matrices
 # TODO: examining only the masked token indices rather than comparing the full true and approximate posterior distributions.
-
-defaultscaler(x) = 1
-
-function standardloss(
-    p::MaskedDiffusionLanguageModel,
-    t::Union{Real,AbstractVector{<:Real}},
-    x̂, x;
-    scaler=defaultscaler
-)
-    α_t, α_prime = p.α(t)
-
-    scaling_factor = α_prime ./ (1 .- α_t)
-
-    if true
-        losses = map(zip(x̂, x)) do (x̂_batch, x_batch)
-            sum(logitcrossentropy.(x̂_batch, x_batch))
-        end
-    else
-
-    end
-
-    return losses .* scaling_factor
-end
 
 ########################### TEST ################################
 
+defaultscaler(x) = 1
+
+# This function is an attempt at a loss function allowing for batching.
+# However, this is unecessarily complicated and a much smoother approach
+# is simply to iterate over a number of time steps and call the loss 
+# function many times as is shown in evaluation.ipynb
 function standardloss(
     p::MaskedDiffusionLanguageModel,
     t::Union{Real,AbstractVector{<:Real}},
@@ -85,3 +64,23 @@ function standardloss(
     end
 end
 
+# By following what we said above, this function easily computes the loss for a single
+# time point t given two arrays {x, x̂} representing the true distribution and the predicted
+# values, respectively.
+function standardloss1(
+    p::MaskedDiffusionLanguageModel,
+    t::Union{Real,AbstractVector{<:Real}},
+    x̂, x;
+    scaler=defaultscaler
+)
+    α_t, α_gradient = p.α(t)
+    scale = (α_gradient)/(1-α_t)
+    return scale * logitcrossentropy(x̂, x)
+end
+
+p = MaskedDiffusionLanguageModel(5, 5, linear)
+
+
+@show standardloss1(p, 0.5, [1, 2, 3], [4, 5, 6])
+
+@show standardloss(p, 0.5, [1, 2, 3], [4, 5, 6])
