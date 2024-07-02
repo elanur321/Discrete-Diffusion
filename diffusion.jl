@@ -81,16 +81,14 @@ end"""
     @assert 0 ≤ s < t ≤ 1 "Invalid time steps: require 0 ≤ s < t ≤ 1" #not sure if this is needed but il keep it here
 
     # Move data to GPU
-    x_0 = CuArray(x_0), x_t = CuArray(x_t)
+    x_0 = CuArray(x_0)
+    x_t = CuArray(x_t)
 
     vocab_size = size(process.embedding, 1)
     x_s = copy(x_t)
     
     alpha_s = process.α(s)[1]
     alpha_t = process.α(t)[1]  
-
-    # Create a mask for non-masked tokens
-    non_masked = x_t .!= process.mask_token_id
 
     # Compute unnormalized log probabilities for all non-masked tokens
     logits = (1 - alpha_s) .* log.(process.mask_vector[1:vocab_size-1]) .+ (alpha_s - alpha_t) .* x_0[1:vocab_size-1, :]
@@ -104,12 +102,11 @@ end"""
     # Sample tokens from categorical distribution. takes random number 0-1 and choses the word with the probability that matches
     sampled_tokens = [rand(Categorical(probs[:, i])) for i in eachindex(probs, 2)]
 
-    # Combine non-masked tokens and sampled tokens
-    x_s = ifelse.(non_masked, x_t, sampled_tokens) #if nonmaksed x_s = x_t else = sampled token
-   
-    return x_s
+    # save positions of previously masked tokens and add the predicted/ newly unmasked tokens to x_s
+    masked_positions = x_t .== process.mask_token_id
+    x_s[masked_positions] .= sampled_tokens[masked_positions]
 
-    "return sample(rng, combine(prior, x_s))"
+    return x_s
 end
 
 # Quick-fix implementation
