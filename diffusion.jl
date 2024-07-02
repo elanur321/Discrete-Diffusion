@@ -22,7 +22,7 @@ struct MaskedDiffusionLanguageModel <: DiscreteStateProcess
 end
 
 # TODO: change to one-hot vector representations of tokens instead of single numbers
-
+"""
 function _sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel, t::Real, x::AbstractArray)
 
     z_t = copy(x)
@@ -36,7 +36,7 @@ function _sampleforward(rng::AbstractRNG, process::MaskedDiffusionLanguageModel,
     end
     return z_t
 
-end
+end"""
 
 " Possible implementation more efficient for GPU computations
 using CUDA
