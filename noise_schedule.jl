@@ -12,8 +12,8 @@ function linear(t::Union{Real,AbstractVector{<:Real}})
     return 1 .- t, - t ./ t
 end
 
-function loglinear(t::Float64; eps::Float64=1e-3)
-    σ = -log1p(-(1 - eps) .* t)
-    dσ_dt =(1 - eps) / (1 .- (1 - eps) .* t)
-    return exp(-σ), -dσ_dt.*exp(-σ)
+function loglinear(t::Union{Real,AbstractVector{<:Real}}; eps::Float64=1e-3)
+    σ = -log1p.(-(1 - eps) .* t)
+    dσ_dt =(1 - eps) ./ (1 .- (1 - eps) .* t)
+    return exp.(-σ), -dσ_dt.*exp.(-σ)
 end
